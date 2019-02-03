@@ -109,7 +109,7 @@ export const types: { [name: string]: TokenType } = {
   backQuote: new TokenType("`", { startsExpr }),
   dollarBraceL: new TokenType("${", { beforeExpr, startsExpr }),
   at: new TokenType("@"),
-  hash: new TokenType("#", { startsExpr }),
+  hash: new TokenType("#", { beforeExpr, prefix, startsExpr }),
 
   // Special hashbang token.
   interpreterDirective: new TokenType("#!..."),

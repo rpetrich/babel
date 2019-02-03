@@ -382,7 +382,8 @@ export default class Tokenizer extends LocationParser {
       this.finishToken(tt.hash);
       return;
     } else if (
-      this.getPluginOption("pipelineOperator", "proposal") === "smart"
+      this.getPluginOption("pipelineOperator", "proposal") === "smart" ||
+      this.hasPlugin("valueTypeOperator")
     ) {
       this.finishOp(tt.hash, 1);
     } else {

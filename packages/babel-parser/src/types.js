@@ -435,7 +435,8 @@ export type UnaryOperator =
   | "typeof"
   | "void"
   | "delete"
-  | "throw";
+  | "throw"
+  | "#";
 
 export type UpdateExpression = NodeBase & {
   type: "UpdateExpression",

@@ -1018,6 +1018,9 @@ export default class ExpressionParser extends LValParser {
             );
           }
         }
+
+        this.expectOnePlugin(["valueTypeOperator"]);
+        this.parseMaybeUnary();
       }
 
       default:
