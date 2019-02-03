@@ -50,6 +50,7 @@ export const UNARY_OPERATORS = [
   ...BOOLEAN_UNARY_OPERATORS,
   ...NUMBER_UNARY_OPERATORS,
   ...STRING_UNARY_OPERATORS,
+  "#",
 ];
 
 export const INHERIT_KEYS = {
