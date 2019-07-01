@@ -38,7 +38,7 @@ export function getPluginOption(
   return null;
 }
 
-const PIPELINE_PROPOSALS = ["minimal", "smart"];
+const PIPELINE_PROPOSALS = ["minimal", "smart", "fsharp"];
 
 export function validatePlugins(plugins: PluginList) {
   if (hasPlugin(plugins, "decorators")) {
@@ -88,12 +88,17 @@ import estree from "./plugins/estree";
 import flow from "./plugins/flow";
 import jsx from "./plugins/jsx";
 import typescript from "./plugins/typescript";
+import placeholders from "./plugins/placeholders";
 
-// NOTE: estree must load first; flow and typescript must load last.
-export const mixinPluginNames = ["estree", "jsx", "flow", "typescript"];
+// NOTE: order is important. estree must come first; placeholders must come last.
 export const mixinPlugins: { [name: string]: MixinPlugin } = {
   estree,
   jsx,
   flow,
   typescript,
+  placeholders,
 };
+
+export const mixinPluginNames: $ReadOnlyArray<string> = Object.keys(
+  mixinPlugins,
+);

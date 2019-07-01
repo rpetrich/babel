@@ -7,23 +7,36 @@ import {
   semverify,
   isUnreleasedVersion,
   getLowestUnreleased,
-  getValues,
   findSuggestion,
 } from "./utils";
-import { objectToBrowserslist } from "./normalize-options";
 import browserModulesData from "../data/built-in-modules.json";
 import { TargetNames } from "./options";
 import type { Targets } from "./types";
 
 const browserslistDefaults = browserslist.defaults;
 
-const validateTargetNames = (validTargets, targets) => {
+const validBrowserslistTargets = [
+  ...Object.keys(browserslist.data),
+  ...Object.keys(browserslist.aliases),
+];
+
+const objectToBrowserslist = (object: Targets): Array<string> => {
+  return Object.keys(object).reduce((list, targetName) => {
+    if (validBrowserslistTargets.indexOf(targetName) >= 0) {
+      const targetVersion = object[targetName];
+      return list.concat(`${targetName} ${targetVersion}`);
+    }
+    return list;
+  }, []);
+};
+
+const validateTargetNames = (targets: Targets): void => {
+  const validTargets = Object.keys(TargetNames);
   for (const target in targets) {
     if (!TargetNames[target]) {
-      const validOptions = getValues(TargetNames);
       throw new Error(
         `Invalid Option: '${target}' is not a valid target
-        Maybe you meant to use '${findSuggestion(validOptions, target)}'?`,
+        Maybe you meant to use '${findSuggestion(validTargets, target)}'?`,
       );
     }
   }
@@ -31,15 +44,19 @@ const validateTargetNames = (validTargets, targets) => {
 
 const browserNameMap = {
   and_chr: "chrome",
+  and_ff: "firefox",
   android: "android",
   chrome: "chrome",
   edge: "edge",
   firefox: "firefox",
   ie: "ie",
+  ie_mob: "ie",
   ios_saf: "ios",
   node: "node",
+  op_mob: "opera",
   opera: "opera",
   safari: "safari",
+  samsung: "samsung",
 };
 
 export const isBrowsersQueryValid = (
@@ -51,6 +68,7 @@ const validateBrowsers = browsers => {
     typeof browsers === "undefined" || isBrowsersQueryValid(browsers),
     `Invalid Option: '${browsers}' is not a valid browserslist query`,
   );
+
   return browsers;
 };
 
@@ -177,15 +195,27 @@ const getTargets = (targets: Object = {}, options: Object = {}): Targets => {
 
   // Parse browsers target via browserslist
   const browsersquery = validateBrowsers(targets.browsers);
+
+  const hasTargets = Object.keys(targets).length > 0;
   const shouldParseBrowsers = !!targets.browsers;
   const shouldSearchForConfig =
-    !options.ignoreBrowserslistConfig && !Object.keys(targets).length;
+    !options.ignoreBrowserslistConfig && !hasTargets;
 
   if (shouldParseBrowsers || shouldSearchForConfig) {
-    browserslist.defaults = objectToBrowserslist(targets);
+    // If no targets are passed, we need to overwrite browserslist's defaults
+    // so that we enable all transforms (acting like the now deprecated
+    // preset-latest).
+    //
+    // Note, if browserslist resolves the config (ex. package.json), then usage
+    // of `defaults` in queries will be different since we don't want to break
+    // the behavior of "no targets is the same as preset-latest".
+    if (!hasTargets) {
+      browserslist.defaults = objectToBrowserslist(targets);
+    }
 
     const browsers = browserslist(browsersquery, {
       path: options.configPath,
+      mobileToDesktop: true,
     });
 
     const queryBrowsers = getLowestVersions(browsers);

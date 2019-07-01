@@ -156,7 +156,7 @@ defineType("TSThisType", {
 
 const fnOrCtr = {
   aliases: ["TSType"],
-  visitor: ["typeParameters", "typeAnnotation"],
+  visitor: ["typeParameters", "parameters", "typeAnnotation"],
   fields: signatureDeclarationCommon,
 };
 
@@ -399,6 +399,7 @@ defineType("TSModuleDeclaration", {
 });
 
 defineType("TSModuleBlock", {
+  aliases: ["Scopable", "Block", "BlockParent"],
   visitor: ["body"],
   fields: {
     body: validateArrayOfType("Statement"),

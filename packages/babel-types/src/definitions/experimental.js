@@ -10,6 +10,8 @@ import {
   classMethodOrDeclareMethodCommon,
 } from "./es2015";
 
+defineType("ArgumentPlaceholder", {});
+
 defineType("AwaitExpression", {
   builder: ["argument"],
   visitor: ["argument"],
@@ -168,7 +170,14 @@ defineType("ClassPrivateMethod", {
     "returnType",
     "typeParameters",
   ],
-  aliases: ["Method", "Private", "Function"],
+  aliases: [
+    "Function",
+    "Scopable",
+    "BlockParent",
+    "FunctionParent",
+    "Method",
+    "Private",
+  ],
   fields: {
     ...classMethodOrDeclareMethodCommon,
     key: {

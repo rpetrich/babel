@@ -15,10 +15,12 @@ export type Options = {
   allowReturnOutsideFunction: boolean,
   allowImportExportEverywhere: boolean,
   allowSuperOutsideMethod: boolean,
+  allowUndeclaredExports: boolean,
   plugins: PluginList,
   strictMode: ?boolean,
   ranges: boolean,
   tokens: boolean,
+  createParenthesizedExpressions: boolean,
 };
 
 export const defaultOptions: Options = {
@@ -40,6 +42,8 @@ export const defaultOptions: Options = {
   allowImportExportEverywhere: false,
   // TODO
   allowSuperOutsideMethod: false,
+  // When enabled, export statements can reference undeclared variables.
+  allowUndeclaredExports: false,
   // An array of plugins to enable
   plugins: [],
   // TODO
@@ -55,13 +59,16 @@ export const defaultOptions: Options = {
   ranges: false,
   // Adds all parsed tokens to a `tokens` property on the `File` node
   tokens: false,
+  // Whether to create ParenthesizedExpression AST nodes (if false
+  // the parser sets extra.parenthesized on the expression nodes instead).
+  createParenthesizedExpressions: false,
 };
 
 // Interpret and default an options object
 
 export function getOptions(opts: ?Options): Options {
   const options: any = {};
-  for (const key in defaultOptions) {
+  for (const key of Object.keys(defaultOptions)) {
     options[key] = opts && opts[key] != null ? opts[key] : defaultOptions[key];
   }
   return options;

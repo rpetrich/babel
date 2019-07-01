@@ -23,9 +23,6 @@ type TopicContextState = {
 
 export default class State {
   strict: boolean;
-  input: string;
-  length: number;
-
   curLine: number;
 
   // And, if locations are used, the {line, column} object
@@ -33,12 +30,9 @@ export default class State {
   startLoc: Position;
   endLoc: Position;
 
-  init(options: Options, input: string): void {
+  init(options: Options): void {
     this.strict =
       options.strictMode === false ? false : options.sourceType === "module";
-
-    this.input = input;
-    this.length = input.length;
 
     this.curLine = options.startLine;
     this.startLoc = this.endLoc = this.curPosition();
@@ -66,13 +60,9 @@ export default class State {
   // and then convert them, we need to track it.
   commaAfterSpreadAt: number = -1;
 
-  // Flags to track whether we are in a function, a generator.
-  inFunction: boolean = false;
+  // Flags to track
   inParameters: boolean = false;
   maybeInArrowParameters: boolean = false;
-  inGenerator: boolean = false;
-  inMethod: boolean | N.MethodKind = false;
-  inAsync: boolean = false;
   inPipeline: boolean = false;
   inType: boolean = false;
   noAnonFunctionType: boolean = false;
@@ -86,6 +76,10 @@ export default class State {
     maxNumOfResolvableTopics: 0,
     maxTopicIndex: null,
   };
+
+  // For the F# plugin
+  soloAwait: boolean = false;
+  inFSharpPipelineDirectBody: boolean = false;
 
   // Check whether we are in a (nested) class or not.
   classLevel: number = 0;
@@ -102,13 +96,9 @@ export default class State {
   // where @foo belongs to the outer class and @bar to the inner
   decoratorStack: Array<Array<N.Decorator>> = [[]];
 
-  // The first yield or await expression inside parenthesized expressions
-  // and arrow function parameters. It is used to disallow yield and await in
-  // arrow function parameters.
-  yieldOrAwaitInPossibleArrowParameters:
-    | N.YieldExpression
-    | N.AwaitExpression
-    | null = null;
+  // Positions to delayed-check that yield/await does not exist in default parameters.
+  yieldPos: number = 0;
+  awaitPos: number = 0;
 
   // Token store.
   tokens: Array<Token | N.Comment> = [];
@@ -184,7 +174,7 @@ export default class State {
       // $FlowIgnore
       let val = this[key];
 
-      if ((!skipArrays || key === "context") && Array.isArray(val)) {
+      if (!skipArrays && Array.isArray(val)) {
         val = val.slice();
       }
 

@@ -72,7 +72,7 @@ defineType("ClassImplements", {
   },
 });
 
-defineInterfaceishType("DeclareClass", "TypeParameterInstantiation");
+defineInterfaceishType("DeclareClass");
 
 defineType("DeclareFunction", {
   visitor: ["id"],
@@ -150,7 +150,7 @@ defineType("DeclareExportAllDeclaration", {
   aliases: ["Flow", "FlowDeclaration", "Statement", "Declaration"],
   fields: {
     source: validateType("StringLiteral"),
-    exportKind: validateOptional(assertOneOf(["type", "value"])),
+    exportKind: validateOptional(assertOneOf("type", "value")),
   },
 });
 

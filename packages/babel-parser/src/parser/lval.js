@@ -16,6 +16,7 @@ import type {
 import type { Pos, Position } from "../util/location";
 import { isStrictBindReservedWord } from "../util/identifier";
 import { NodeUtils } from "./node";
+import { type BindingTypes, BIND_NONE, BIND_LEXICAL } from "../util/scopeflags";
 
 export default class LValParser extends NodeUtils {
   // Forward-declaration: defined in expression.js
@@ -92,6 +93,14 @@ export default class LValParser extends NodeUtils {
           }
           break;
 
+        case "ParenthesizedExpression":
+          node.expression = this.toAssignable(
+            node.expression,
+            isBinding,
+            contextDescription,
+          );
+          break;
+
         case "MemberExpression":
           if (!isBinding) break;
 
@@ -121,7 +130,7 @@ export default class LValParser extends NodeUtils {
 
       this.raise(prop.key.start, error);
     } else if (prop.type === "SpreadElement" && !isLast) {
-      this.raiseRestNotLast(prop.start, "property");
+      this.raiseRestNotLast(prop.start);
     } else {
       this.toAssignable(prop, isBinding, "object destructuring pattern");
     }
@@ -159,7 +168,7 @@ export default class LValParser extends NodeUtils {
       if (elt) {
         this.toAssignable(elt, isBinding, contextDescription);
         if (elt.type === "RestElement") {
-          this.raiseRestNotLast(elt.start, "element");
+          this.raiseRestNotLast(elt.start);
         }
       }
     }
@@ -212,7 +221,7 @@ export default class LValParser extends NodeUtils {
     return this.finishNode(node, "SpreadElement");
   }
 
-  parseRest(): RestElement {
+  parseRestBinding(): RestElement {
     const node = this.startNode();
     this.next();
     node.argument = this.parseBindingAtom();
@@ -222,9 +231,6 @@ export default class LValParser extends NodeUtils {
   // Parses lvalue (assignable) atom.
   parseBindingAtom(): Pattern {
     switch (this.state.type) {
-      case tt.name:
-        return this.parseIdentifier();
-
       case tt.bracketL: {
         const node = this.startNode();
         this.next();
@@ -234,10 +240,9 @@ export default class LValParser extends NodeUtils {
 
       case tt.braceL:
         return this.parseObj(true);
-
-      default:
-        throw this.unexpected();
     }
+
+    return this.parseIdentifier();
   }
 
   parseBindingList(
@@ -259,13 +264,8 @@ export default class LValParser extends NodeUtils {
       } else if (this.eat(close)) {
         break;
       } else if (this.match(tt.ellipsis)) {
-        elts.push(this.parseAssignableListItemTypes(this.parseRest()));
-        this.checkCommaAfterRest(
-          close,
-          this.state.inFunction && this.state.inParameters
-            ? "parameter"
-            : "element",
-        );
+        elts.push(this.parseAssignableListItemTypes(this.parseRestBinding()));
+        this.checkCommaAfterRest();
         this.expect(close);
         break;
       } else {
@@ -325,7 +325,7 @@ export default class LValParser extends NodeUtils {
 
   checkLVal(
     expr: Expression,
-    isBinding: ?boolean,
+    bindingType: BindingTypes = BIND_NONE,
     checkClashes: ?{ [key: string]: boolean },
     contextDescription: string,
   ): void {
@@ -337,7 +337,7 @@ export default class LValParser extends NodeUtils {
         ) {
           this.raise(
             expr.start,
-            `${isBinding ? "Binding" : "Assigning to"} '${
+            `${bindingType === BIND_NONE ? "Assigning to" : "Binding"} '${
               expr.name
             }' in strict mode`,
           );
@@ -358,15 +358,26 @@ export default class LValParser extends NodeUtils {
           const key = `_${expr.name}`;
 
           if (checkClashes[key]) {
-            this.raise(expr.start, "Argument name clash in strict mode");
+            this.raise(expr.start, "Argument name clash");
           } else {
             checkClashes[key] = true;
           }
         }
+        if (bindingType === BIND_LEXICAL && expr.name === "let") {
+          this.raise(
+            expr.start,
+            "'let' is not allowed to be used as a name in 'let' or 'const' declarations.",
+          );
+        }
+        if (!(bindingType & BIND_NONE)) {
+          this.scope.declareName(expr.name, bindingType, expr.start);
+        }
         break;
 
       case "MemberExpression":
-        if (isBinding) this.raise(expr.start, "Binding member expression");
+        if (bindingType !== BIND_NONE) {
+          this.raise(expr.start, "Binding member expression");
+        }
         break;
 
       case "ObjectPattern":
@@ -374,7 +385,7 @@ export default class LValParser extends NodeUtils {
           if (prop.type === "ObjectProperty") prop = prop.value;
           this.checkLVal(
             prop,
-            isBinding,
+            bindingType,
             checkClashes,
             "object destructuring pattern",
           );
@@ -386,7 +397,7 @@ export default class LValParser extends NodeUtils {
           if (elem) {
             this.checkLVal(
               elem,
-              isBinding,
+              bindingType,
               checkClashes,
               "array destructuring pattern",
             );
@@ -397,21 +408,35 @@ export default class LValParser extends NodeUtils {
       case "AssignmentPattern":
         this.checkLVal(
           expr.left,
-          isBinding,
+          bindingType,
           checkClashes,
           "assignment pattern",
         );
         break;
 
       case "RestElement":
-        this.checkLVal(expr.argument, isBinding, checkClashes, "rest element");
+        this.checkLVal(
+          expr.argument,
+          bindingType,
+          checkClashes,
+          "rest element",
+        );
+        break;
+
+      case "ParenthesizedExpression":
+        this.checkLVal(
+          expr.expression,
+          bindingType,
+          checkClashes,
+          "parenthesized expression",
+        );
         break;
 
       default: {
         const message =
-          (isBinding
-            ? /* istanbul ignore next */ "Binding invalid"
-            : "Invalid") +
+          (bindingType === BIND_NONE
+            ? "Invalid"
+            : /* istanbul ignore next */ "Binding invalid") +
           " left-hand side" +
           (contextDescription
             ? " in " + contextDescription
@@ -430,27 +455,19 @@ export default class LValParser extends NodeUtils {
     }
   }
 
-  checkCommaAfterRest(close: TokenType, kind: string): void {
+  checkCommaAfterRest(): void {
     if (this.match(tt.comma)) {
-      if (this.lookahead().type === close) {
-        this.raiseCommaAfterRest(this.state.start, kind);
-      } else {
-        this.raiseRestNotLast(this.state.start, kind);
-      }
+      this.raiseRestNotLast(this.state.start);
     }
   }
 
-  checkCommaAfterRestFromSpread(kind: string): void {
+  checkCommaAfterRestFromSpread(): void {
     if (this.state.commaAfterSpreadAt > -1) {
-      this.raiseCommaAfterRest(this.state.commaAfterSpreadAt, kind);
+      this.raiseRestNotLast(this.state.commaAfterSpreadAt);
     }
   }
 
-  raiseCommaAfterRest(pos: number, kind: string) {
-    this.raise(pos, `A trailing comma is not permitted after the rest ${kind}`);
-  }
-
-  raiseRestNotLast(pos: number, kind: string) {
-    this.raise(pos, `The rest ${kind} must be the last ${kind}`);
+  raiseRestNotLast(pos: number) {
+    this.raise(pos, `Rest element must be last element`);
   }
 }
